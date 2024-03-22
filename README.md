@@ -1,6 +1,6 @@
 # maubot-mathpix
 
-A simple matrix plugin for [maubot](https://github.com/maubot/maubot), which calls the [Mathpix text(latex) OCR API](https://mathpix.com/ocr) to convert images to latex.
+A simple matrix plugin for [maubot](https://github.com/maubot/maubot), which calls the [Mathpix text(LaTex) OCR API](https://mathpix.com/ocr) to convert images to latex.
 
 ## Installation
 
