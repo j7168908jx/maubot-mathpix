@@ -1,0 +1,1 @@
+from .mathpixplugin import MathpixPlugin

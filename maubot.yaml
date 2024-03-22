@@ -1,0 +1,10 @@
+maubot: 0.1.0
+id: com.advancedsolver.mathpix
+version: 1.0.0
+license: MIT
+modules:
+  - mathpix
+main_class: MathpixPlugin
+config: true
+extra_files:
+  - base-config.yaml

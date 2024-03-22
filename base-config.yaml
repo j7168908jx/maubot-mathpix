@@ -1,0 +1,5 @@
+
+app_id: ""
+app_key: ""
+
+endpoint: "https://api.mathpix.com/v3/text"
