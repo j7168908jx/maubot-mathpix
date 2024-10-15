@@ -37,3 +37,9 @@ Directly send images to the bot, and it will respond with the latex code.
     $$
     ```
 
+## Known Issues
+
+- The plugin does not store the session keys and will possibly fail if manually restarted.
+  - From the backend log one will see `...Failed to decrypt megolm event: no session with given ID...` as a warning.
+  - It is likely caused by the lost of key for previous chat decryption. (a guess)
+  - In this case, restart the bot, and users should leave the room and rejoin to get the bot to work again.
