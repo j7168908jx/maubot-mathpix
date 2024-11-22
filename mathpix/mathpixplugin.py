@@ -8,18 +8,19 @@ from maubot.handlers import event
 from maubot.matrix import MaubotMessageEvent
 from mautrix.crypto.attachments import decrypt_attachment
 from mautrix.types import EventType, MessageType, EncryptedFile
+from mautrix.types.event.message import MediaMessageEventContent
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 
 def _build_json_response(response: dict) -> str:
-    html_output = '<ul>\n'
+    assert "text" in response, "No text in ocr server response"
+
+    html_output = '<p><strong>Meta:</strong></p>\n<pre><code>'
     for key, value in response.items():
         v = str(value) if key != "text" else "..."
-        html_output += f'  <li><strong>{key}:</strong> {v[:40]}</li>\n'
-    html_output += '</ul>'
+        html_output += f'  {key}: {v[:40]}\n'
+    html_output += '</code></pre>\n<p><strong>Text:</strong></p>\n'
+    html_output += f"<pre><code>{response['text']}</code></pre>\n"
     return html_output
-
-def _parse_response(response: str) -> str:
-    return f"<pre><code>{response}</code></pre>"
 
 
 class Config(BaseProxyConfig):
@@ -30,6 +31,7 @@ class Config(BaseProxyConfig):
 
 
 class MathpixPlugin(Plugin):
+    config: BaseProxyConfig
 
     @classmethod
     def get_config_class(cls) -> Type[BaseProxyConfig]:
@@ -50,33 +52,42 @@ class MathpixPlugin(Plugin):
 
     @event.on(EventType.ROOM_MESSAGE)
     async def start_ocr(self, evt: MaubotMessageEvent):
-        self.log.debug("Mathpix ocr bot detect message!")
         if evt.content.msgtype != MessageType.IMAGE:
+            self.log.debug(f"Mathpix ocr bot detect message: type: {evt.content.msgtype}")
             return
         self.log.info("Mathpix ocr bot detect image message!")
 
-        file = evt.content.file  # type: EncryptedFile
+        content = evt.content
+        assert isinstance(content, MediaMessageEventContent), f"Unexpected content type: {content}"
+
+        file = content.file  # type: EncryptedFile | None
         self.log.debug(f"Mathpix ocr bot received file meta: {file}")
 
-        await evt.react("👌")
         await evt.mark_read()
-
-        enc_image_bytes = await self.client.download_media(file.url)
-
-        image_bytes = decrypt_attachment(
-            enc_image_bytes,
-            key=file.key.key, hash=file.hashes["sha256"], iv=file.iv
-        )
+        if file is None:
+            # this is the case for unencrypted room message
+            # retrieve image from content mcx url
+            assert content.url is not None, "No url in content"
+            image_bytes = await self.client.download_media(content.url)
+            await evt.respond("Note: You are sending message in an unencrypted room. Please consider enabling end-to-end encryption in this room.")
+        else:
+            # encrypted room message, retreive image from encrypted file
+            assert file.url is not None, "No url in encrypted file"
+            enc_image_bytes = await self.client.download_media(file.url)
+            image_bytes = decrypt_attachment(
+                enc_image_bytes,
+                key=file.key.key, hash=file.hashes["sha256"], iv=file.iv
+            )
+        await evt.react("👌")
+        self.log.debug(f"Mathpix ocr bot received image: size {len(image_bytes)} bytes")
 
         try:
             response = await self.post_image(image_bytes)
             response1 = _build_json_response(response)
-            response2 = _parse_response(response["text"])
             await evt.respond(response1, allow_html=True)
-            await evt.respond(response2, allow_html=True)
 
         except Exception:
-            await evt.respond("Mathpix ocr bot encountered an internal error.")
+            await evt.respond("Mathpix ocr bot encountered an internal error when querying ocr server.")
 
     async def post_image(self, image_bytes) -> dict:
         headers = {
